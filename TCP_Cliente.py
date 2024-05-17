@@ -1,6 +1,7 @@
 import socket as s
 import time as t
 import hashlib as h
+import threading as th
 import os
 
 NOME_DO_SERVER = '127.0.0.1'
@@ -63,9 +64,12 @@ def conectar_servidor():
 def escolher_arquivo(cliente_socket : s.socket):
     conjunto_arquivos = []
     num_arquivos = cliente_socket.recv(TAM_BUFFER).decode('utf-8')
+    num_arquivos = int(num_arquivos)
     
-    if int(num_arquivos) < 0 or not isinstance(num_arquivos, int):
+    if not isinstance(num_arquivos, int):
         mensagem_envio(cliente_socket, 'ERROR-1-Má requisição')
+    elif num_arquivos < 0:
+        mensagem_envio(cliente_socket, 'ERROR-2-Tamanho incongruente')
     else:
         mensagem_envio(cliente_socket, 'OK-1-Confirmação')
 
@@ -73,8 +77,7 @@ def escolher_arquivo(cliente_socket : s.socket):
         recv_arquivo = mensagem_recebimento(cliente_socket)
         conjunto_arquivos.append(recv_arquivo)
         
-    arquivo_disponivel = False
-    while not arquivo_disponivel:
+    while True:
         os.system('cls' if os.name == 'nt' else 'clear')
         titulo()
         print('Arquivos disponíveis no servidor:')
@@ -85,28 +88,49 @@ def escolher_arquivo(cliente_socket : s.socket):
         
         mensagem_envio(cliente_socket, nome_arquivo)
         
-        ok_arq = mensagem_recebimento(cliente_socket)
-        ok_arq = ok_arq.split("-")
+        ok_arq = mensagem_recebimento(cliente_socket).split("-")
     
         if(ok_arq[0] == 'OK'):
-            arquivo_disponivel = True
+            break
         else:
             print('A escolha precisa estar nas opções acima!')
             t.sleep(2)
 
 
-def receber_arquivo(cliente_socket : s.socket):
+def requisitar_arquivo(cliente_socket : s.socket):
+    escolher_arquivo(cliente_socket)
     print('Recebendo')
     
 
-def requisitar_arquivo(cliente_socket : s.socket):
-    escolher_arquivo(cliente_socket)
-    receber_arquivo(cliente_socket)
-    
+def receber_mensagem_servidor(cliente : s.socket):
+  while True:
+      try:
+          msg = cliente.recv(TAM_BUFFER).decode('utf-8').strip()
+          print(msg)
+          if(msg == "Sair"):
+                break
+      except:
+          return
 
-def chat_servidor(cliente_socket : s.socket):
-    print('Olá')
 
+def enviar_mensagem_servidor(cliente : s.socket, username):
+  while True:
+      try:
+          msg = input()
+          cliente.send(f'<{username}> {msg}'.encode('utf-8'))
+      except:
+          return
+
+def chat_servidor(client : s.socket, username : str):
+    os.system('cls' if os.name == 'nt' else 'clear')
+    print("Chat CLIENTE X SERVIDOR")
+    while True:
+        thread_receber_msg = th.Thread(target=receber_mensagem_servidor, args=[client])
+        thread_enviar_msg = th.Thread(target=enviar_mensagem_servidor, args=[client, username])
+
+        thread_receber_msg.start()
+        thread_enviar_msg.start()
+        
 
 def main():
     os.system('cls' if os.name == 'nt' else 'clear')
@@ -114,28 +138,42 @@ def main():
     cliente_socket.settimeout(30)
 
     iniciar_conexao = conectar_servidor()
+    username = input("Digite o nome do usuário: ").strip()
     cliente_socket.connect(ENDERECO_IP)
 
     opcao = 0
-    while iniciar_conexao:
+    try:
+        while iniciar_conexao:
+            os.system('cls' if os.name == 'nt' else 'clear')
+            titulo()
+            opcoes()
+            opcao = int(input("Escolha uma opção: "))
+            match opcao:
+                case 1:
+                    mensagem_envio(cliente_socket, 'OPTION-1-Requisição de arquivo')
+                    requisitar_arquivo(cliente_socket)
+                case 2:
+                    mensagem_envio(cliente_socket, 'OPTION-2-Chat')
+                    chat_servidor(cliente_socket, username)
+                case 3:
+                    iniciar_conexao = conectar_servidor()
+                    if not iniciar_conexao:
+                        mensagem_envio(cliente_socket, 'OPTION-3-Desconectar servidor')
+                case _:
+                    print('A escolha precisa estar nas opções acima!')
+                    t.sleep(2)
+                    opcao = 0
+                    
+    except TimeoutError:
         os.system('cls' if os.name == 'nt' else 'clear')
         titulo()
-        opcoes()
-        opcao = int(input("Escolha uma opção: "))
+        print("ERROR-5-Excedeu-se o tempo para comunicação entre o servidor e o cliente!")
         
-        match opcao:
-            case 1:
-                requisitar_arquivo(cliente_socket)
-            case 2:
-                chat_servidor(cliente_socket)
-            case 3:
-                iniciar_conexao = conectar_servidor()
-            case _:
-                print('A escolha precisa estar nas opções acima!')
-                t.sleep(2)
-                print(opcao)
-                print(type(opcao))
-                opcao = 0
+    except Exception as e:
+        os.system('cls' if os.name == 'nt' else 'clear')
+        titulo()
+        print("ERROR-0-Erro não registrado!")
+        print(e)
                 
     cliente_socket.close()
 
