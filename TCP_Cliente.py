@@ -95,17 +95,47 @@ def escolher_arquivo(cliente_socket : s.socket):
         else:
             print('A escolha precisa estar nas opções acima!')
             t.sleep(2)
+            
+    return nome_arquivo
 
 
 def requisitar_arquivo(cliente_socket : s.socket):
-    escolher_arquivo(cliente_socket)
-    print('Recebendo')
+    nome_arquivo = escolher_arquivo(cliente_socket)
+    
+    pacotes = []
+    name = nome_arquivo.split(".")
+    nome_arquivo = name[0] + "_cliente." + name[1]
+    conf = mensagem_recebimento(cliente_socket).split("-")
+    
+    if(conf[0] == "OK"):
+        arquivo = open(nome_arquivo, "wb")
+        num_pacotes = int(conf[2])
+        
+        i = 0
+        while i < num_pacotes:
+            pack = cliente_socket.recv(TAM_BUFFER)
+            mensagem_envio(cliente_socket, f"ACK-{i+1}")
+            arquivo.write(pack)
+            i+=1
+        
+        arquivo.close()
+        
+        os.system('cls' if os.name == 'nt' else 'clear')
+        titulo()
+        print('Arquivo Recebido com Sucesso')
+        t.sleep(2)
+        
+        #verificar_integridade_arquivo(cliente_socket, pacotes)
+            
+            
+def verificar_integridade_arquivo(cliente_socket : s.socket, pacotes : list):
+    print("Hash")
     
 
 def receber_mensagem_servidor(cliente : s.socket):
   while True:
       try:
-          msg = cliente.recv(TAM_BUFFER).decode('utf-8').strip()
+          msg = cliente.recv(TAM_BUFFER).decode('utf-8')
           print(msg)
           if(msg == "Sair"):
                 break
@@ -120,6 +150,7 @@ def enviar_mensagem_servidor(cliente : s.socket, username):
           cliente.send(f'<{username}> {msg}'.encode('utf-8'))
       except:
           return
+
 
 def chat_servidor(client : s.socket, username : str):
     os.system('cls' if os.name == 'nt' else 'clear')
@@ -138,7 +169,7 @@ def main():
     cliente_socket.settimeout(30)
 
     iniciar_conexao = conectar_servidor()
-    username = input("Digite o nome do usuário: ").strip()
+    username = input("Digite o nome do usuário: ")
     cliente_socket.connect(ENDERECO_IP)
 
     opcao = 0

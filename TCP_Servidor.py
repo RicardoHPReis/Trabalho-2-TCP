@@ -119,13 +119,26 @@ def retornar_nome_arquivos(conexao_socket:s.socket):
     
 def enviar_arquivo(conexao_socket:s.socket):
     nome_arquivo = retornar_nome_arquivos(conexao_socket)
-    print(f"Nome do arquivo: {nome_arquivo}")
+    num_pacotes = (os.path.getsize(os.path.join("./Arquivos", nome_arquivo)) // TAM_BUFFER) + 1
+    
+    mensagem_envio(conexao_socket, f"OK-2-{num_pacotes}")
+    with open(os.path.join("./Arquivos", nome_arquivo), "rb") as arquivo:
+        i = 0
+        while data := arquivo.read(TAM_BUFFER):
+            conexao_socket.send(data)
+            ack = mensagem_recebimento(conexao_socket).strip("-")
+            if (ack[1] == str(num_pacotes)):
+                print('Todos os pacotes foram mandados com sucesso!')
+                t.sleep(2)
+                break
+            if (ack[1] == str(i+1)):
+                i += 1
         
 
 def receber_mensagem_servidor(server : s.socket):
     while True:
         try:
-            msg = server.recv(TAM_BUFFER).decode('utf-8').strip()
+            msg = server.recv(TAM_BUFFER).decode('utf-8')
             print(msg)
             if(msg == "Sair"):
                 break
@@ -165,7 +178,6 @@ def main():
     except:
         print('Não foi possível iniciar o servidor!')
         return
-    
 
     iniciar_server = iniciar_servidor()
     os.system('cls' if os.name == 'nt' else 'clear')
