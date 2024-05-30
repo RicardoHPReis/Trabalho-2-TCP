@@ -21,16 +21,12 @@ def titulo():
 
 def mensagem_envio(servidor_socket : s.socket, mensagem : str):
     servidor_socket.send(mensagem.encode())
-    print("--------------------")
-    print('Enviado: ', mensagem)
-    print("--------------------\n")
+    logger.info(f"Enviado:  '{mensagem}'")
 
 
 def mensagem_recebimento(servidor_socket : s.socket):
     mensagem = servidor_socket.recv(TAM_BUFFER).decode('utf-8')
-    print("--------------------")
-    print('Recebido: ', mensagem)
-    print("--------------------\n")
+    logger.info(f"Recebido: '{mensagem}'")
     return mensagem
 
 
@@ -71,7 +67,7 @@ def iniciar_servidor():
     return iniciar_server
 
 
-def opcoes_cliente(conexao_socket:s.socket, clientes : list):
+def opcoes_cliente(conexao_socket:s.socket):
     opcao = 0
     cliente_opcao = mensagem_recebimento(conexao_socket).split("-")
     
@@ -84,6 +80,7 @@ def opcoes_cliente(conexao_socket:s.socket, clientes : list):
         case 2:
             chat_servidor(conexao_socket)
         case 3:
+            iniciar_server = False
             clientes.remove(conexao_socket)
 
 
@@ -166,8 +163,6 @@ def chat_servidor(client : s.socket):
 
 
 def main():
-    clientes = []
-
     os.system('cls' if os.name == 'nt' else 'clear')
     server_socket = s.socket(s.AF_INET, s.SOCK_STREAM)
     
@@ -186,9 +181,15 @@ def main():
     while iniciar_server:
         conexao_socket, endereco = server_socket.accept()
         clientes.append(conexao_socket)
-        thread = th.Thread(target=opcoes_cliente, args=(conexao_socket, clientes), daemon=True)
+        thread = th.Thread(target=opcoes_cliente, args=(conexao_socket,), daemon=True)
         thread.start()
         
 
 if __name__ == "__main__":
+    clientes = []
+    iniciar_server = False
+    
+    logger = l.getLogger(__name__)
+    l.basicConfig(filename="server.log", encoding="utf-8", level=l.INFO, format="%(levelname)s - %(asctime)s: %(message)s")
+
     main()

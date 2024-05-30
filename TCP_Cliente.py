@@ -1,5 +1,6 @@
 import socket as s
 import time as t
+import logging as l
 import hashlib as h
 import threading as th
 import os
@@ -25,16 +26,12 @@ def opcoes():
 
 def mensagem_envio(cliente_socket : s.socket, mensagem : str):
     cliente_socket.send(mensagem.encode())
-    print("--------------------")
-    print('Enviado: ', mensagem)
-    print("--------------------\n")
+    logger.info(f"Enviado:  '{mensagem}'")
 
 
 def mensagem_recebimento(cliente_socket : s.socket):
     mensagem = cliente_socket.recv(TAM_BUFFER).decode('utf-8')
-    print("--------------------")
-    print('Recebido: ', mensagem)
-    print("--------------------\n")
+    logger.info(f"Recebido: '{mensagem}'")
     return mensagem
 
 
@@ -166,7 +163,7 @@ def chat_servidor(client : s.socket, username : str):
 def main():
     os.system('cls' if os.name == 'nt' else 'clear')
     cliente_socket = s.socket(s.AF_INET, s.SOCK_STREAM)
-    cliente_socket.settimeout(30)
+    cliente_socket.settimeout(60)
 
     iniciar_conexao = conectar_servidor()
     username = input("Digite o nome do usuário: ")
@@ -208,5 +205,9 @@ def main():
                 
     cliente_socket.close()
 
+
 if __name__ == "__main__":
+    logger = l.getLogger(__name__)
+    l.basicConfig(filename="cliente.log", encoding="utf-8", level=l.INFO, format="%(levelname)s - %(asctime)s: %(message)s")
+    
     main()
