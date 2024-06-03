@@ -10,6 +10,9 @@ PORTA_DO_SERVER = 6000
 TAM_BUFFER = 2048
 ENDERECO_IP = (NOME_DO_SERVER, PORTA_DO_SERVER)
 
+logger = l.getLogger(__name__)
+l.basicConfig(filename="cliente.log", encoding="utf-8", level=l.INFO, format="%(levelname)s - %(asctime)s: %(message)s")
+
 # Funções padrão --------------------------------------------
 
 def titulo():
@@ -70,9 +73,13 @@ def escolher_arquivo(cliente_socket : s.socket):
     else:
         mensagem_envio(cliente_socket, 'OK-1-Confirmação')
 
-    for i in range(0, int(num_arquivos)):
+    i = 0
+    while i < num_arquivos:
         recv_arquivo = mensagem_recebimento(cliente_socket)
+        mensagem_envio(cliente_socket, f"ACK-{i+1}")
         conjunto_arquivos.append(recv_arquivo)
+        i+=1
+        
         
     while True:
         os.system('cls' if os.name == 'nt' else 'clear')
@@ -206,8 +213,5 @@ def main():
     cliente_socket.close()
 
 
-if __name__ == "__main__":
-    logger = l.getLogger(__name__)
-    l.basicConfig(filename="cliente.log", encoding="utf-8", level=l.INFO, format="%(levelname)s - %(asctime)s: %(message)s")
-    
+if __name__ == "__main__": 
     main()

@@ -11,6 +11,12 @@ TAM_BUFFER = 2048
 PORTA_DO_SERVER = 6000
 ENDERECO_IP = (NOME_DO_SERVER, PORTA_DO_SERVER)
 
+clientes = []
+iniciar_server = False
+    
+logger = l.getLogger(__name__)
+l.basicConfig(filename="server.log", encoding="utf-8", level=l.INFO, format="%(levelname)s - %(asctime)s: %(message)s")
+
 # Funções padrão --------------------------------------------
 
 def titulo():
@@ -32,13 +38,12 @@ def mensagem_recebimento(servidor_socket : s.socket):
 
 def chat_envio(servidor_socket : s.socket, mensagem : str):
     servidor_socket.send(mensagem.encode())
-    print("--------------------")
-    print('Enviado: ', mensagem)
-    print("--------------------\n")
+    logger.info(f"Chat enviado: '{mensagem}'")
     
 
 def chat_recebimento(servidor_socket : s.socket):
     mensagem = servidor_socket.recv(TAM_BUFFER).decode('utf-8')
+    logger.info(f"Chat recebido: '{mensagem}'")
     print(mensagem)
     print("--------------------\n")
     return mensagem
@@ -67,7 +72,7 @@ def iniciar_servidor():
     return iniciar_server
 
 
-def opcoes_cliente(conexao_socket:s.socket):
+def opcoes_cliente(conexao_socket:s.socket, endereco:tuple):
     opcao = 0
     cliente_opcao = mensagem_recebimento(conexao_socket).split("-")
     
@@ -80,8 +85,9 @@ def opcoes_cliente(conexao_socket:s.socket):
         case 2:
             chat_servidor(conexao_socket)
         case 3:
-            iniciar_server = False
+            print("Desconectando o cliente...")
             clientes.remove(conexao_socket)
+            conexao_socket.close()
 
 
 def retornar_nome_arquivos(conexao_socket:s.socket):
@@ -96,12 +102,26 @@ def retornar_nome_arquivos(conexao_socket:s.socket):
     confirmacao_tam = mensagem_recebimento(conexao_socket).split("-")
     
     if(confirmacao_tam[0] == "ERROR"):
+        os.system('cls' if os.name == 'nt' else 'clear')
+        titulo()
+        print("Erro na Requisição")
         t.sleep(2)
         os.system('cls' if os.name == 'nt' else 'clear')
         return
+    elif(num_arquivos <= 0):
+        os.system('cls' if os.name == 'nt' else 'clear')
+        titulo()
+        print("Nenhum arquivo no servidor")
+        t.sleep(2)
+        os.system('cls' if os.name == 'nt' else 'clear')
     else:
-        for i in range(0, num_arquivos):
+        i = 0
+        while i < num_arquivos:
             mensagem_envio(conexao_socket, file_paths[i])
+            ack = mensagem_recebimento(conexao_socket).split("-")
+            print(ack)
+            if (ack[1] == str(i+1)):
+                i += 1
             
         while True:
             nome_arquivo = mensagem_recebimento(conexao_socket)
@@ -123,7 +143,7 @@ def enviar_arquivo(conexao_socket:s.socket):
         i = 0
         while data := arquivo.read(TAM_BUFFER):
             conexao_socket.send(data)
-            ack = mensagem_recebimento(conexao_socket).strip("-")
+            ack = mensagem_recebimento(conexao_socket).split("-")
             if (ack[1] == str(num_pacotes)):
                 print('Todos os pacotes foram mandados com sucesso!')
                 t.sleep(2)
@@ -181,15 +201,10 @@ def main():
     while iniciar_server:
         conexao_socket, endereco = server_socket.accept()
         clientes.append(conexao_socket)
-        thread = th.Thread(target=opcoes_cliente, args=(conexao_socket,), daemon=True)
+        
+        thread = th.Thread(target=opcoes_cliente, args=(conexao_socket, endereco), daemon=True)
         thread.start()
         
 
 if __name__ == "__main__":
-    clientes = []
-    iniciar_server = False
-    
-    logger = l.getLogger(__name__)
-    l.basicConfig(filename="server.log", encoding="utf-8", level=l.INFO, format="%(levelname)s - %(asctime)s: %(message)s")
-
     main()
