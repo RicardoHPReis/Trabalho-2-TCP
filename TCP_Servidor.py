@@ -30,7 +30,7 @@ def mensagem_envio(cliente_socket : s.socket, endereco : tuple, mensagem : str):
         cliente_socket.send(mensagem.encode())
         logger.info(f"Destinatário: {endereco} - Enviado:  '{mensagem}'")
     except:
-        logger.info(f"Cliente removido:  {endereco}")
+        logger.warning(f"Cliente removido:  {endereco}")
         clientes.remove(cliente_socket)
 
 
@@ -40,7 +40,7 @@ def mensagem_recebimento(cliente_socket : s.socket, endereco : tuple):
         logger.info(f"Remetente: {endereco} - Recebido: '{mensagem}'")
         return mensagem
     except:
-        logger.info(f"Cliente removido:  {endereco}")
+        logger.warning(f"Cliente removido:  {endereco}")
         clientes.remove(cliente_socket)
 
 
@@ -49,7 +49,7 @@ def chat_envio(cliente_socket : s.socket, endereco:tuple, mensagem : str):
         cliente_socket.send(mensagem.encode())
         logger.info(f"Destinatário: {endereco} - Chat enviado:  '{mensagem}'")
     except:
-        logger.info(f"Cliente removido do chat:  {endereco}")
+        logger.warning(f"Cliente removido do chat:  {endereco}")
         clientes.remove(cliente_socket)
     
 
@@ -59,7 +59,7 @@ def chat_recebimento(cliente_socket : s.socket, endereco:tuple):
         logger.info(f"Remetente: {endereco} - Chat recebido: '{mensagem}'")
         return mensagem
     except:
-        logger.info(f"Cliente removido do chat: {endereco}")
+        logger.warning(f"Cliente removido do chat: {endereco}")
         clientes.remove(cliente_socket)
     
 
@@ -107,7 +107,7 @@ def opcoes_servidor(cliente_socket:s.socket, endereco:tuple):
         case 3:
             resposta = mensagem_recebimento(cliente_socket, endereco).split("-")
             if resposta[0] == "OK":
-                logger.info(f"Cliente desconectado: {endereco}")
+                logger.warning(f"Cliente desconectado: {endereco}")
                 clientes.remove(cliente_socket)
                 mensagem_envio(cliente_socket, endereco, 'OK-8-Desconectado')
                 
@@ -193,8 +193,15 @@ def enviar_arquivo(cliente_socket:s.socket, endereco:tuple):
             try:
                 cliente_socket.send(data_criptografada)
             except:
-                logger.info(f"Cliente removido:  {endereco}")
+                logger.error(f"Cliente removido:  {endereco}")
                 clientes.remove(cliente_socket)
+                
+            while cliente_socket.recv(TAM_BUFFER) == b"NOK":
+                try:
+                    cliente_socket.send(data_criptografada)
+                except:
+                    logger.error(f"Cliente removido:  {endereco}")
+                    clientes.remove(cliente_socket)
                 
             ack = mensagem_recebimento(cliente_socket, endereco).split("-")
             if (ack[1] == str(num_pacotes)):
