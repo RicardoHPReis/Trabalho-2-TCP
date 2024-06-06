@@ -25,28 +25,42 @@ def titulo():
     print("--------------------\n")
 
 
-def mensagem_envio(servidor_socket : s.socket, mensagem : str):
-    servidor_socket.send(mensagem.encode())
-    logger.info(f"Enviado:  '{mensagem}'")
+def mensagem_envio(cliente_socket : s.socket, endereco : tuple, mensagem : str):
+    try:
+        cliente_socket.send(mensagem.encode())
+        logger.info(f"Destinatário: {endereco} - Enviado:  '{mensagem}'")
+    except:
+        logger.info(f"Cliente removido:  {endereco}")
+        clientes.remove(cliente_socket)
 
 
-def mensagem_recebimento(servidor_socket : s.socket):
-    mensagem = servidor_socket.recv(TAM_BUFFER).decode('utf-8')
-    logger.info(f"Recebido: '{mensagem}'")
-    return mensagem
+def mensagem_recebimento(cliente_socket : s.socket, endereco : tuple):
+    try:
+        mensagem = cliente_socket.recv(TAM_BUFFER).decode('utf-8')
+        logger.info(f"Remetente: {endereco} - Recebido: '{mensagem}'")
+        return mensagem
+    except:
+        logger.info(f"Cliente removido:  {endereco}")
+        clientes.remove(cliente_socket)
 
 
-def chat_envio(servidor_socket : s.socket, mensagem : str):
-    servidor_socket.send(mensagem.encode())
-    logger.info(f"Chat enviado: '{mensagem}'")
+def chat_envio(cliente_socket : s.socket, endereco:tuple, mensagem : str):
+    try:
+        cliente_socket.send(mensagem.encode())
+        logger.info(f"Destinatário: {endereco} - Chat enviado:  '{mensagem}'")
+    except:
+        logger.info(f"Cliente removido do chat:  {endereco}")
+        clientes.remove(cliente_socket)
     
 
-def chat_recebimento(servidor_socket : s.socket):
-    mensagem = servidor_socket.recv(TAM_BUFFER).decode('utf-8')
-    logger.info(f"Chat recebido: '{mensagem}'")
-    print(mensagem)
-    print("--------------------\n")
-    return mensagem
+def chat_recebimento(cliente_socket : s.socket, endereco:tuple):
+    try:
+        mensagem = cliente_socket.recv(TAM_BUFFER).decode('utf-8')
+        logger.info(f"Remetente: {endereco} - Chat recebido: '{mensagem}'")
+        return mensagem
+    except:
+        logger.info(f"Cliente removido do chat: {endereco}")
+        clientes.remove(cliente_socket)
     
 
 def iniciar_servidor():
@@ -72,34 +86,46 @@ def iniciar_servidor():
     return iniciar_server
 
 
-def opcoes_cliente(conexao_socket:s.socket, endereco:tuple):
+def opcoes_servidor(cliente_socket:s.socket, endereco:tuple):
+    os.system('cls' if os.name == 'nt' else 'clear')
+    titulo()
+    print(f"{len(clientes)} cliente(s) conectado(s)...")
+    
     opcao = 0
-    cliente_opcao = mensagem_recebimento(conexao_socket).split("-")
+    cliente_opcao = mensagem_recebimento(cliente_socket, endereco).split("-")
     
     if cliente_opcao[0] == 'OPTION':
         opcao = int(cliente_opcao[1])
         
     match opcao:
         case 1:
-            enviar_arquivo(conexao_socket)
+            enviar_arquivo(cliente_socket, endereco)
+            opcoes_servidor(cliente_socket, endereco)
         case 2:
-            chat_servidor(conexao_socket)
+            chat(cliente_socket, endereco)
+            opcoes_servidor(cliente_socket, endereco)
         case 3:
-            print("Desconectando o cliente...")
-            clientes.remove(conexao_socket)
-            conexao_socket.close()
+            resposta = mensagem_recebimento(cliente_socket, endereco).split("-")
+            if resposta[0] == "OK":
+                logger.info(f"Cliente desconectado: {endereco}")
+                clientes.remove(cliente_socket)
+                mensagem_envio(cliente_socket, endereco, 'OK-8-Desconectado')
+                
+                os.system('cls' if os.name == 'nt' else 'clear')
+                titulo()
+                print(f"{len(clientes)} cliente(s) conectado(s)...")
 
 
-def retornar_nome_arquivos(conexao_socket:s.socket):
+def retornar_nome_arquivos(cliente_socket:s.socket, endereco:tuple):
     os.system('cls' if os.name == 'nt' else 'clear')
 
     caminho = str(p.Path.cwd()) + '\Arquivos'
     file_paths = os.listdir(caminho)
     num_arquivos = len(file_paths)
 
-    mensagem_envio(conexao_socket, str(num_arquivos))
+    mensagem_envio(cliente_socket, endereco, str(num_arquivos))
     
-    confirmacao_tam = mensagem_recebimento(conexao_socket).split("-")
+    confirmacao_tam = mensagem_recebimento(cliente_socket, endereco).split("-")
     
     if(confirmacao_tam[0] == "ERROR"):
         os.system('cls' if os.name == 'nt' else 'clear')
@@ -108,78 +134,92 @@ def retornar_nome_arquivos(conexao_socket:s.socket):
         t.sleep(2)
         os.system('cls' if os.name == 'nt' else 'clear')
         return
+    
     elif(num_arquivos <= 0):
         os.system('cls' if os.name == 'nt' else 'clear')
         titulo()
         print("Nenhum arquivo no servidor")
         t.sleep(2)
         os.system('cls' if os.name == 'nt' else 'clear')
+        
     else:
         i = 0
         while i < num_arquivos:
-            mensagem_envio(conexao_socket, file_paths[i])
-            ack = mensagem_recebimento(conexao_socket).split("-")
-            print(ack)
+            mensagem_envio(cliente_socket, endereco, file_paths[i])
+            ack = mensagem_recebimento(cliente_socket, endereco).split("-")
             if (ack[1] == str(i+1)):
                 i += 1
             
         while True:
-            nome_arquivo = mensagem_recebimento(conexao_socket)
+            nome_arquivo = mensagem_recebimento(cliente_socket, endereco)
                 
             if not os.path.exists(os.path.join("./Arquivos", nome_arquivo)):
-                mensagem_envio(conexao_socket, "ERROR-3-Arquivo não encontrado!")
+                mensagem_envio(cliente_socket, endereco, "ERROR-3-Arquivo não encontrado!")
             else:
-                mensagem_envio(conexao_socket, 'OK-1-Confirmação')
+                mensagem_envio(cliente_socket, endereco, 'OK-1-Confirmação')
                 break
         return nome_arquivo
     
     
-def enviar_arquivo(conexao_socket:s.socket):
-    nome_arquivo = retornar_nome_arquivos(conexao_socket)
-    num_pacotes = (os.path.getsize(os.path.join("./Arquivos", nome_arquivo)) // TAM_BUFFER) + 1
+def checksum_arquivo(nome_arquivo: str) -> str:
+    checksum = h.md5()
+    with open(os.path.join("./Arquivos", nome_arquivo), "rb") as file:
+        while data := file.read(TAM_BUFFER):
+            checksum.update(data)
+
+    return checksum.hexdigest()
     
-    mensagem_envio(conexao_socket, f"OK-2-{num_pacotes}")
+
+def criptografar_arquivo(data:bytes, num_buffer:int, i:int):
+    hash_ = h.md5(data).digest()
+    data_cripto = b" ".join([f"{i:{'0'}{num_buffer}}".encode(), hash_, data])
+
+    return data_cripto
+        
+    
+def enviar_arquivo(cliente_socket:s.socket, endereco:tuple):
+    nome_arquivo: str = retornar_nome_arquivos(cliente_socket, endereco)
+    num_pacotes: int = (os.path.getsize(os.path.join("./Arquivos", nome_arquivo)) // TAM_BUFFER) + 1
+    num_digitos: int = len(str(num_pacotes))
+    num_buffer: int = num_digitos + 1 + 16 + 1 + TAM_BUFFER
+    checksum: str = checksum_arquivo(nome_arquivo)
+    
+    mensagem_envio(cliente_socket, endereco, f"OK-2-{num_pacotes}-{num_digitos}-{num_buffer}-{checksum}")
     with open(os.path.join("./Arquivos", nome_arquivo), "rb") as arquivo:
         i = 0
         while data := arquivo.read(TAM_BUFFER):
-            conexao_socket.send(data)
-            ack = mensagem_recebimento(conexao_socket).split("-")
+            data_criptografada = criptografar_arquivo(data, num_buffer, i)
+            
+            try:
+                cliente_socket.send(data_criptografada)
+            except:
+                logger.info(f"Cliente removido:  {endereco}")
+                clientes.remove(cliente_socket)
+                
+            ack = mensagem_recebimento(cliente_socket, endereco).split("-")
             if (ack[1] == str(num_pacotes)):
                 print('Todos os pacotes foram mandados com sucesso!')
                 t.sleep(2)
                 break
             if (ack[1] == str(i+1)):
                 i += 1
-        
-
-def receber_mensagem_servidor(server : s.socket):
-    while True:
-        try:
-            msg = server.recv(TAM_BUFFER).decode('utf-8')
-            print(msg)
-            if(msg == "Sair"):
-                break
-        except:
-            return
 
 
-def enviar_mensagem_servidor(server : s.socket):
-    while True:
-        try:
-            msg = input()
-            server.send(f'<Servidor> {msg}'.encode('utf-8'))
-        except:
+def chat(cliente_socket: s.socket, endereco: tuple):
+    os.system('cls' if os.name == 'nt' else 'clear')
+    titulo()
+    print("CHAT SERVIDOR X CLIENTE\n\n")
+    cliente_msg = ""
+    servidor_msg = ""
+    
+    while servidor_msg.lower() != "sair":
+        cliente_msg = chat_recebimento(cliente_socket, endereco)
+        print(f"<{endereco}> {cliente_msg}")
+        if cliente_msg.lower() == "sair":
             break
 
-
-def chat_servidor(client : s.socket):
-    os.system('cls' if os.name == 'nt' else 'clear')
-    print("Chat SERVIDOR X CLIENTE")
-    thread_receber_msg = th.Thread(target=receber_mensagem_servidor, args=[client])
-    thread_enviar_msg = th.Thread(target=enviar_mensagem_servidor, args=[client])
-
-    thread_receber_msg.start()
-    thread_enviar_msg.start()
+        servidor_msg = input("<Servidor> ")
+        chat_envio(cliente_socket, endereco, servidor_msg[:1024])
 
 
 def main():
@@ -189,20 +229,21 @@ def main():
     try:
         server_socket.bind(ENDERECO_IP)
         server_socket.listen()
-        server_socket.settimeout(30)
+        server_socket.settimeout(60)
     except:
         print('Não foi possível iniciar o servidor!')
         return
 
     iniciar_server = iniciar_servidor()
     os.system('cls' if os.name == 'nt' else 'clear')
+    titulo()
     print('Esperando resposta')
 
     while iniciar_server:
-        conexao_socket, endereco = server_socket.accept()
-        clientes.append(conexao_socket)
+        cliente_socket, endereco = server_socket.accept()
+        clientes.append(cliente_socket)
         
-        thread = th.Thread(target=opcoes_cliente, args=(conexao_socket, endereco), daemon=True)
+        thread = th.Thread(target=opcoes_servidor, args=(cliente_socket, endereco), daemon=True)
         thread.start()
         
 
