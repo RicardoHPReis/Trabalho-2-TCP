@@ -139,52 +139,6 @@ def escolher_arquivo(conexao_socket : s.socket):
     return nome_arquivo
 
 
-def requisitar_arquivo(conexao_socket : s.socket):
-    nome_arquivo = escolher_arquivo(conexao_socket)
-    
-    pacotes = []
-    archive = nome_arquivo.split(".")
-    nome_arquivo = archive[0] + "_cliente." + archive[1]
-    dados = mensagem_recebimento(conexao_socket).split("-")
-    
-    if(dados[0] == "OK"):
-        os.makedirs("./Recebidos", exist_ok=True)
-        
-        num_pacotes = int(dados[2])
-        num_digitos = int(dados[3])
-        tam_buffer = int(dados[4])
-        checksum = dados[5]
-        
-        hash_inicio = num_digitos + 1
-        hash_final = hash_inicio + 16
-        checksum = h.md5()
-        
-        i = 0
-        with open(os.path.join("./Recebidos", nome_arquivo), "wb") as arquivo:
-            while i < num_pacotes:
-                try:
-                    pack = conexao_socket.recv(tam_buffer)
-                except:
-                    logger.error(f"Removido do Servidor:  {ENDERECO_IP}")
-                    conexao_socket.close()
-                
-                pacote_valido = verificar_integridade_arquivo(conexao_socket, pack, hash_inicio, hash_final, tam_buffer)
-                mensagem_envio(conexao_socket, f"ACK-{i+1}")
-                checksum.update(pacote_valido)
-                arquivo.write(pacote_valido)
-                i+=1
-        
-        arquivo.close()
-        
-        os.system('cls' if os.name == 'nt' else 'clear')
-        titulo()
-        if checksum.hexdigest() == checksum:
-            print("Arquivo transferido com sucesso!")
-        else:
-            print("A transferência de arquivo não teve sucesso!!!")
-        t.sleep(2)
-
-
 def descriptografar_arquivo(pacote : bytes, hash_inicio : int, hash_final : int) -> tuple[bytes, bytes, bytes]:
     nr_pacote = pacote[0:3]
     parte_checksum = pacote[hash_inicio:hash_final]
@@ -196,17 +150,64 @@ def descriptografar_arquivo(pacote : bytes, hash_inicio : int, hash_final : int)
 def verificar_integridade_arquivo(conexao_socket : s.socket, pacote : bytes, hash_inicio : int, hash_final : int, tam_buffer : int):
     nr_pacote, parte_checksum, data = descriptografar_arquivo(pacote, hash_inicio, hash_final)
     while h.md5(data).digest() != parte_checksum:
-        conexao_socket.send(b"NOK")
-        try:
-            packet = conexao_socket.recv(tam_buffer)
-        except:
-            logger.error(f"Removido do Servidor:  {ENDERECO_IP}")
-            conexao_socket.close()
-            break;
-        nr_pacote, parte_checksum, data = descriptografar_arquivo(packet, hash_inicio, hash_final)
+        #conexao_socket.send(b"NOK")
+        #try:
+            #packet = conexao_socket.recv(tam_buffer)
+        #except:
+            #logger.error(f"Removido do Servidor:  {ENDERECO_IP}")
+            #conexao_socket.close()
+            #break;
+        nr_pacote, parte_checksum, data = descriptografar_arquivo(pacote, hash_inicio, hash_final)
+        #logger.info(f"'{h.md5(data).digest() != parte_checksum}'")
         
     return data
 
+
+def requisitar_arquivo(conexao_socket : s.socket):
+    nome_arquivo = escolher_arquivo(conexao_socket)
+    
+    pacotes = []
+    archive = nome_arquivo.split(".")
+    nome_arquivo = archive[0] + "_cliente." + archive[1]
+    dados = mensagem_recebimento(conexao_socket).split("-")
+    mensagem_envio(conexao_socket, "OK-1-Confirmação")
+    
+    if(dados[0] == "OK"):
+        os.makedirs("./Recebidos", exist_ok=True)
+        
+        num_pacotes = int(dados[2])
+        num_digitos = int(dados[3])
+        tam_buffer = int(dados[4])
+        checksum = dados[5]
+        
+        hash_inicio = num_digitos + 1
+        hash_final = hash_inicio + 16
+        checksum_completo = h.md5()
+        
+        with open(os.path.join("./Recebidos", nome_arquivo), "wb") as arquivo:
+            for i in range(0, num_pacotes):
+                packet = conexao_socket.recv(tam_buffer)
+
+                packet_number, part_checksum, data = descriptografar_arquivo(packet, hash_inicio, hash_final)
+
+                while h.md5(data).digest() != part_checksum:
+                    mensagem_envio(conexao_socket, "NOK")
+                    packet = conexao_socket.recv(tam_buffer)
+                    packet_number, part_checksum, data = descriptografar_arquivo(packet, hash_inicio, hash_final)
+
+                checksum_completo.update(data)
+                arquivo.write(data)
+                conexao_socket.send(b"OK")
+        
+        arquivo.close()
+        
+        os.system('cls' if os.name == 'nt' else 'clear')
+        titulo()
+        if checksum_completo.hexdigest() == checksum:
+            print("Arquivo transferido com sucesso!")
+        else:
+            print("A transferência de arquivo não teve sucesso!!!")
+        t.sleep(2)
 
 def chat_servidor(conexao_socket: s.socket):
     os.system('cls' if os.name == 'nt' else 'clear')

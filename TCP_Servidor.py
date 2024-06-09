@@ -177,7 +177,7 @@ def criptografar_arquivo(data:bytes, num_buffer:int, i:int):
     return data_cripto
         
     
-def enviar_arquivo(cliente_socket:s.socket, endereco:tuple):
+def enviar_arquivo_2(cliente_socket:s.socket, endereco:tuple):
     nome_arquivo: str = retornar_nome_arquivos(cliente_socket, endereco)
     num_pacotes: int = (os.path.getsize(os.path.join("./Arquivos", nome_arquivo)) // TAM_BUFFER) + 1
     num_digitos: int = len(str(num_pacotes))
@@ -185,6 +185,10 @@ def enviar_arquivo(cliente_socket:s.socket, endereco:tuple):
     checksum: str = checksum_arquivo(nome_arquivo)
     
     mensagem_envio(cliente_socket, endereco, f"OK-2-{num_pacotes}-{num_digitos}-{num_buffer}-{checksum}")
+    inicio = mensagem_recebimento(cliente_socket, endereco).split("-")
+    if inicio[0] != "OK":
+        return
+    
     with open(os.path.join("./Arquivos", nome_arquivo), "rb") as arquivo:
         i = 0
         while data := arquivo.read(TAM_BUFFER):
@@ -192,17 +196,20 @@ def enviar_arquivo(cliente_socket:s.socket, endereco:tuple):
             
             try:
                 cliente_socket.send(data_criptografada)
+                logger.info(f"Destinatário: {endereco} - Enviado:  'Pacote {i+1}'")
             except:
                 logger.error(f"Cliente removido:  {endereco}")
                 clientes.remove(cliente_socket)
+                break
                 
-            while cliente_socket.recv(TAM_BUFFER) == b"NOK":
-                try:
-                    cliente_socket.send(data_criptografada)
-                except:
-                    logger.error(f"Cliente removido:  {endereco}")
-                    clientes.remove(cliente_socket)
-                
+            #while mensagem_recebimento(cliente_socket, endereco) != "ACK":
+            #    try:
+            #        cliente_socket.send(data_criptografada)
+            #        logger.info(f"Destinatário: {endereco} - Enviado:  'Pacote {i+1}'")
+            #    except:
+            #        logger.error(f"Cliente removido:  {endereco}")
+            #        clientes.remove(cliente_socket)
+            
             ack = mensagem_recebimento(cliente_socket, endereco).split("-")
             if (ack[1] == str(num_pacotes)):
                 print('Todos os pacotes foram mandados com sucesso!')
@@ -210,6 +217,41 @@ def enviar_arquivo(cliente_socket:s.socket, endereco:tuple):
                 break
             if (ack[1] == str(i+1)):
                 i += 1
+    
+    
+def enviar_arquivo(cliente_socket:s.socket, endereco:tuple):
+    nome_arquivo: str = retornar_nome_arquivos(cliente_socket, endereco)
+    num_pacotes: int = (os.path.getsize(os.path.join("./Arquivos", nome_arquivo)) // TAM_BUFFER) + 1
+    num_digitos: int = len(str(num_pacotes))
+    num_buffer: int = num_digitos + 1 + 16 + 1 + TAM_BUFFER
+    checksum: str = checksum_arquivo(nome_arquivo)
+
+    mensagem_envio(cliente_socket, endereco, f"OK-2-{num_pacotes}-{num_digitos}-{num_buffer}-{checksum}")
+    inicio = mensagem_recebimento(cliente_socket, endereco).split("-")
+    if inicio[0] != "OK":
+        return
+
+    with open(os.path.join("./Arquivos", nome_arquivo), "rb") as arquivo:
+        i = 0
+        while data := arquivo.read(TAM_BUFFER):
+            hash_ = h.md5(data).digest()
+            try:
+                cliente_socket.send(b" ".join([f"{i:{'0'}{num_digitos}}".encode(), hash_, data]))
+                logger.info(f"Destinatário: {endereco} - Enviado:  'Pacote {i+1}'")
+            except:
+                logger.error(f"Cliente removido:  {endereco}")
+                clientes.remove(cliente_socket)
+                break
+            
+            while mensagem_recebimento(cliente_socket, endereco) == "NOK":
+                try:
+                    cliente_socket.send(b" ".join([f"{i:{'0'}{num_digitos}}".encode(), hash_, data]))
+                    logger.info(f"Destinatário: {endereco} - Enviado:  'Pacote {i+1}'")
+                except:
+                    logger.error(f"Cliente removido:  {endereco}")
+                    clientes.remove(cliente_socket)
+                    break
+            i += 1
 
 
 def chat(cliente_socket: s.socket, endereco: tuple):
