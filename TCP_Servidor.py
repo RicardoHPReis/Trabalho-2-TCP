@@ -17,12 +17,15 @@ class Servidor:
         self.__TAM_BUFFER = 2048
         self.__ENDERECO_IP = (self.__NOME_DO_SERVER, self.__PORTA_DO_SERVER)
         
+        self.__clientes = []
+        
+        
         self.__clientes = []        
 
         self.__server_socket = s.socket(s.AF_INET, s.SOCK_STREAM)
         self.__server_socket.bind(self.__ENDERECO_IP)
         self.__server_socket.listen()
-        self.__server_socket.settimeout(60)
+        #self.__server_socket.settimeout(60)
         self.logger.info(f"Socket do servidor criado na porta: '{self.__PORTA_DO_SERVER}'")
         
     
@@ -141,8 +144,7 @@ class Servidor:
     def retornar_nome_arquivos(self, cliente_socket:s.socket, endereco:tuple):
         os.system('cls' if os.name == 'nt' else 'clear')
 
-        caminho = str(p.Path.cwd()) + '\Arquivos'
-        file_paths = os.listdir(caminho)
+        file_paths = os.listdir("./Arquivos")
         num_arquivos = len(file_paths)
 
         self.mensagem_envio(cliente_socket, endereco, str(num_arquivos))
